@@ -1,0 +1,58 @@
+title                    = MD run
+
+;Integrator
+integrator               = md		; leap-frog integrator
+dt                       = 0.002	; timestep (4fs)
+nsteps                   = 50000000	;  100 ns
+comm-mode                = Linear
+
+; OUTPUT CONTROL OPTIONS
+nstxtcout          	 =  25000	; compressed co-ordinates every 50ps
+nstlog             	 =  50000	; freq. energies/lincs deviation to log file 100 ps
+nstenergy          	 =  50000	; freq. to write energy to .edr
+nstxout            	 =  500000	; full precision, r, every 1ns
+nstvout            	 =  500000	; full precision, v, every 1ns
+nstfout            	 =  500000	; full precision, f
+xtc-precision            = 1000
+xtc-grps                 = System
+energygrps               = System
+
+; NEIGHBORSEARCHING PARAMETERS
+nstlist                  = 10		;
+ns_type                  = grid
+pbc                      = xyz
+
+; OPTIONS FOR ELECTROSTATICS AND VDW
+cutoff-scheme		 = Verlet
+; rlist is not needed as it is dynamically updated according to verlet-buffer-drift/verlet scheme
+coulombtype              = PME
+rcoulomb                 = 1.0
+;shift vdw potential to zero at cut-off with verlet scheme
+vdw-type                 = Cut-off
+rvdw                     = 1.0
+
+; Temperature coupling  
+tcoupl			 = V-rescale            ; V-rescale Thermostat
+tc-grps                  = Protein Non-Protein
+tau-t                    = 0.1 0.1		; coupling time constant [ps]
+ref-t                    = 300 300		; reference coupling temperature [K]
+; Pressure coupling     
+pcoupl		        = Parrinello-Rahman	    ; Pressure coupling on in NPT
+pcoupltype	        = isotropic	            ; uniform scaling of box vectors
+tau_p		        = 2.0		            ; time constant, in ps
+ref_p		        = 1.0		            ; reference pressure, in bar
+compressibility     = 4.5e-5	            ; isothermal compressibility of water, bar^-1
+
+; GENERATE VELOCITIES FOR STARTUP RUN
+gen-vel                  = no		; use velocity from previous step
+
+; OPTIONS FOR BONDS    
+constraints              = all-bonds	; all bonds are converted to constraints
+constraint-algorithm     = Lincs	
+; Do not apply constraints to starting confirmation (before first step)
+continuation             = yes
+lincs-order              = 4
+lincs-iter               = 2
+
+; Dispersion correction
+DispCorr	= EnerPres	; account for cut-off vdW scheme

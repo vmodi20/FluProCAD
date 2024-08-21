@@ -1,0 +1,48 @@
+########################## Declaring the modules into python path ############3
+pythonversion1="2.5"
+pythonversion2="3.0"
+pythonversion3="3.2"
+pythonversion4="3.3"
+DEFpythonversion=1
+
+echo "------------------------------------------------------------------------"
+echo
+echo "The currently supported architectures are as follows:"
+echo
+echo '   0) Python 2.3, 2.4.'
+echo '   1) Python 2.5 to  2.7.' 
+echo '   2) Python 3.0, 3.1.'
+echo '   3) Python 3.2.'
+echo '   4) Python 3.3 to 3.7.' 
+
+printf "Select the version of python installed on your system:" 
+read ans
+if [ x$ans != x ] ; then
+  pythonversion=$ans
+else
+  pythonversion=$DEFpythonversion
+fi
+if [ $pythonversion = 0 ] ; then PYTHON_VERSION="" ; fi
+if [ $pythonversion = 1 ] ; then PYTHON_VERSION=python$pythonversion1 ; fi
+if [ $pythonversion = 2 ] ; then PYTHON_VERSION=python$pythonversion2 ; fi
+if [ $pythonversion = 3 ] ; then PYTHON_VERSION=python$pythonversion3 ; fi
+if [ $pythonversion = 4 ] ; then PYTHON_VERSION=python$pythonversion4 ; fi
+
+cat << EOF >> ~/.bashrc
+export MODINSTALL="/projappl/vamodi/modeller9.22"
+export EXECUTABLE_TYPE="x86_64-intel8"
+
+######### User specific aliases and functions ##############
+if [ -z $PYTHONPATH ]; then
+    export PYTHONPATH="${MODINSTALL}/modlib:${MODINSTALL}/lib/${EXECUTABLE_TYPE}/${PYTHON_VERSION}"
+else
+    export PYTHONPATH="${PYTHONPATH}:${MODINSTALL}/modlib:${MODINSTALL}/lib/${EXECUTABLE_TYPE}/${PYTHON_VERSION}"
+fi
+
+if [ -z $LD_LIBRARY_PATH ]; then
+    export LD_LIBRARY_PATH="${MODINSTALL}/lib/${EXECUTABLE_TYPE}"
+else
+    export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${MODINSTALL}/lib/${EXECUTABLE_TYPE}"
+fi
+
+EOF

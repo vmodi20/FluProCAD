@@ -1,0 +1,47 @@
+title			 = Short Position Restrained NVT
+define                   = -DPOSRES	; using position restraints
+
+integrator               = md		; leap-frog algorithm
+dt                       = 0.002	; time-step [ps]
+nsteps                   = 250000	; 500 ps
+
+nstlog                   =  5000	; freq. energies/lincs deviation to log file 10 ps
+nstcalcenergy            =  50          ; freq. for energy calc., multiple of nstlist 
+nstenergy                =  250		; freq. to write energy to .edr
+nstxout                  =  2500           ; full precision, r, every 5 ps
+nstvout                  =  2500         ; full precision, v, every 5 ps
+nstfout                  =  2500        ; full precision, f
+energygrps               = System
+
+; NEIGHBORSEARCHING PARAMETERS
+nstlist                  = 10           ; freq. to update neighbour list
+ns_type                  = grid		; check atoms in neighbouring grid for new list
+pbc                      = xyz		; with peiodic boundary conditions
+
+; OPTIONS FOR ELECTROSTATICS AND VDW
+coulombtype              = PME
+rcoulomb                 = 1.0
+;shift vdw potential to zero at cut-off with verlet scheme
+vdw-type                 = Cut-off
+rvdw                     = 1.0
+
+; Temperature coupling  
+tcoupl                   = V-rescale	; V-rescale Thermostat
+tc-grps                  = Protein Non-Protein	; Couple separately
+tau-t                    = 0.1 0.1	; coupling time constant [ps]
+ref-t                    = 300 300	; reference temperature [K]
+
+; Pressure coupling     
+Pcoupl                   = No
+
+; GENERATE VELOCITIES FOR STARTUP RUN
+gen-vel                  = yes		; generate new velocities
+gen-temp                 = 300		; <T> of Maxwell distribution
+gen-seed                 = 173529
+
+; OPTIONS FOR BONDS    
+constraints              = all-bonds	; convert all bonds to constraints
+constraint-algorithm     = Lincs
+continuation             = no
+lincs-order              = 4
+lincs-iter               = 2
