@@ -1,0 +1,11 @@
+name: fpc
+
+dependencies:
+  - python>=3.11
+  - pdbfixer
+  - openmm
+  - pmx
+  - numpy
+  - scipy
+  - matplotlib
+  - gromacs

@@ -1,0 +1,12 @@
+11
+CYS	SG	1	CYS	SG	1	0.2	CYS2	CYS2
+CYS	SG	1	HEM 	FE	2	0.25	CYS2	HEME
+CYS	SG	1	HEM 	CAB	1	0.18	CYS2	HEME
+CYS	SG	1	HEM 	CAC	1	0.18	CYS2	HEME
+HIS	NE2	1	HEM 	FE	1	0.2	HIS1	HEME
+MET	SD	1	HEM 	FE	1	0.24	MET	HEME
+CO      C       1       HEME    FE      1       0.19    CO      HEME
+CYM     SG      1       CYM     SG      1       0.2     CYS2    CYS2
+PHE     C       1       SYTY    N1      1       0.1335  PHE     SYTY
+F2L     C       1       SYTY    N1      1       0.1335  F2L     SYTY
+SYTY    C3      1       VAL     N       1       0.1335  SYTY    VAL                 

@@ -1,0 +1,2 @@
+PHE 64 LEU A
+SER 2 TYR A
