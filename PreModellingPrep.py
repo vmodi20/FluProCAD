@@ -1,5 +1,6 @@
 import os
 import shutil
+import urllib.request
 from openmm import app
 import pdbfixer
 import argparse
@@ -12,7 +13,7 @@ parser.add_argument("-mutfile", required=False, help="File with mutations to int
 parser.add_argument("-crotype", required=True, help="Type of chromophore: SYG or TYG")
 parser.add_argument("-cresid", required=True, help="Index of the chromophore residue")
 parser.add_argument("-protoligmr", help="Please check if your protein complex is a monomer or a dimer", required=False, default="dimer")
-parser.add_argument("-fe", help="Perform free energy calculations", default="no")
+parser.add_argument("-fe", help="Perform free energy calculations (yes/no)", required=False, default="yes" )
 
 args = parser.parse_args()
 
@@ -30,24 +31,23 @@ if args.protoligmr not in ["monomer", "dimer"]:
 if args.protoligmr == "monomer": num_chains = 1
 elif args.protoligmr == "dimer": num_chains = 2
 
-def create_wrkdir(dirname):
-    os.mkdir(dirname)
-    os.chdir(dirname)
+# Check if the pdb file or a pdbid is provided
+if args.pdbid is not None and args.pdbfile is not None:
+    print("Please provide either a PDB file or a PDB ID!")
+    exit()
 
-# Load the PDB file
 if args.pdbid:
     protname = args.pdbid
-    create_wrkdir(protname)
-    fixer = pdbfixer.PDBFixer(pdbid=args.pdbid)
-    app.PDBFile.writeFile(fixer.topology, fixer.positions, open(args.pdbid+'.pdb', 'w'))
+    urllib.request.urlretrieve("https://files.rcsb.org/download/"+protname+".pdb", protname+".pdb")
 elif args.pdbfile:
     protname = args.pdbfile.split('.')[0]
-    create_wrkdir(protname)
-    shutil.copy(cwd + '/' + args.pdbfile, args.pdbfile)
-    fixer = pdbfixer.PDBFixer(filename=args.pdbfile)
-else:
-    print("Please provide a PDB file or a PDB ID!")
-    exit()
+
+# create a new directory and if it exists, move the existing directory to a new one
+if os.path.exists(protname): shutil.move(protname, protname+'_old')
+os.makedirs(protname)
+shutil.copy(cwd+'/'+protname+'.pdb', protname)
+os.chdir(protname)
+fixer = pdbfixer.PDBFixer(filename=protname+'.pdb')
 
 # Special case for pdbid 1GFL: mixing the chromophore residues into a single residue with the name and index provided by the user
 if args.pdbid == '1gfl':
@@ -132,7 +132,7 @@ def build_mutation(fixer, mut=args.mutfile):
    
     return fixer
 
-if args.fe == "no":
+if args.fe is None or args.fe == "no":
     fixer = build_mutation(fixer)
     # save the mutated structure to pdb file
     app.PDBFile.writeFile(fixer.topology, fixer.positions, open('prepped.pdb', 'w'), keepIds=True)
