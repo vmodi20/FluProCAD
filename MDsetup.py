@@ -9,7 +9,7 @@ import argparse
 # Parse user input info as arguments
 parser = argparse.ArgumentParser(description='Prepare Gromacs format topology and structure files with aa mutations to setup the free energy MD simulations')
 parser.add_argument("-proteindir", help='Directory with the prepped protein structure', required=True)
-parser.add_argument("-mut", help='Mutation to introduce in the format: residue, residue ID, mutated_residue, chainID')
+parser.add_argument("-mutfile", help='file with mutationd to introduce in the format: residue, residue ID, mutated_residue')
 parser.add_argument("-ffmut", help='Force field for the mutated residues: amber99sbmut, amber03_gfp', required=False, default='amber99sb-star-ildn-mut_FP')
 parser.add_argument("-water", help='Water model', required=False, default='tip3p')
 parser.add_argument("-protoligmr", help="Please check if your protein complex is a monomer or a dimer", required=False, default="dimer")
@@ -20,9 +20,9 @@ args = parser.parse_args()
 cwd = os.getcwd()
 ff = cwd + '/data/forcefields'
 mdppath = cwd + '/data/mdp-files/'
-mutfile = cwd + '/' + args.mut
+mutfile = cwd + '/' + args.mutfile
 
-#os.environ['GMXLIB'] = '~/FPC/data/forcefields'
+#os.environ['GMXLIB'] = cwd + '/data/forcefields'
 
 os.chdir(args.proteindir)
 
@@ -54,6 +54,46 @@ def gen_monomer(protfile):
     pml.create("monomer", "chainA")
     pml.save("monomer.pdb", "monomer")
     shutil.copy("prepped.pdb", "dimer.pdb")
+
+#check if command gmx exists
+def check_gmx():
+    if shutil.which('gmx') is None:
+        print("Gromacs is not installed or not in the PATH. Please install Gromacs and add it to the PATH.")
+        exit()
+    else:
+        print("Gromacs is installed and in the PATH.")
+        print("#"*50)
+
+# Function to create bash file with gmx commands for equilibration MD step:
+def runMDeq():
+    bashfile = 'runMD-equilb.sh'
+    # copy all files from the directory 'mdppath' to current working directory
+
+    with open(bashfile, 'w') as file:
+        file.write('#!/bin/bash\n')
+        file.write('\n# Run minimization, NVT, and NPT simulations using Gromacs\n')
+        file.write('gmx_mpi grompp -f min.mdp -c ions.pdb -p newtopol.top -o min.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -deffnm min\n')
+        file.write('gmx_mpi grompp -f nvt.mdp -c min.gro -p newtopol.top -r min.gro -o nvt.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -deffnm nvt\n')
+        file.write('gmx_mpi grompp -f npt.mdp -c nvt.gro -p newtopol.top -r nvt.gro -o npt.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -deffnm npt\n')
+        file.write('gmx_mpi grompp -f md.mdp -c npt.gro -p newtopol.top -r npt.gro -o topol.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -s topol\n')
+        file.write('\n'"#"*50'\n')
+        file.close()
+
+# Function to create bash file with gmx commands for free energy MD step:
+def runMDfe():
+    bashfile = 'runMD-fe.sh'
+    # copy all files from the directory 'mdppath' to the current working directory
+
+    with open(bashfile, 'w') as file:
+        file.write('#!/bin/bash\n')
+        file.write('\n# Run free energy calculations using Gromacs\n')
+        file.write("#"*50)
+        file.close()
+
 
 # Check the oligomeric state of the protein complex
 if args.protoligmr not in ["monomer", "dimer"]:
@@ -98,7 +138,7 @@ for olig in ['monomer', 'dimer']:
         pmutref = Model('conf.pdb', renumber_residues=False)
 
         # mutate residues of chain A and B if protein is a dimer, else over chain A only
-        for oresnm, mresid, mresnm, tmp in mutline:
+        for oresnm, mresid, mresnm in mutline:
             mchain = "A"
             pmut = mutate(m=pmutref, mut_resid=int(mresid), mut_resname=mresnm, mut_chain=mchain, ff='amber99sb-star-ildn-mut_FP')
             if olig == 'dimer':
@@ -152,7 +192,7 @@ print("Proceeding to build the unfolded state peptide...")
 # Generate a tripeptide GXG with the mutation residue as X to model the unfolded state
 os.makedirs('unfolded')
 os.chdir('unfolded')
-for oresnm, mresid, mresnm, mchain in mutline:
+for oresnm, mresid, mresnm in mutline:
     ocode = library._one_letter[oresnm]
     mcode = library._one_letter[mresnm]
     os.mkdir(ocode + '2' + mcode) 
@@ -199,3 +239,106 @@ print("#"*50)
 print("Generated the unfolded state!")
 
 os.chdir(cwd)
+
+# Check the net charge of system in mutated state and scale the charge of ions to neutralize the system
+
+def check_stateB_charge(pdbfile, topfile, mutfile=args.mutfile):
+    aa_charg_dict = {
+        'ALA': 0,
+        'ARG': 1,
+        'ASN': 0,
+        'ASP': -1,
+        'CYS': 0,
+        'GLN': 0,
+        'GLU': -1,
+        'GLH': 0,
+        'GLY': 0,
+        'HIS': 0,
+        'HIE': 0,
+        'HIP': 1,
+        'HID': 0,
+        'ILE': 0,
+        'LEU': 0,
+        'LYS': 1,
+        'MET': 0,
+        'PHE': 0,
+        'PRO': 0,
+        'SER': 0,
+        'THR': 0,
+        'TRP': 0,
+        'TYR': 0,
+        'VAL': 0,
+        }
+
+    # Read the mutations file and calculate the net charge of the mutated residues
+    with open(mutfile, 'r') as file:
+        mutline = [line.split() for line in file]
+    net_charge = 0
+    for oresnm, mresid, mresnm, mchain in mutline:
+        net_charge += aa_charg_dict[mresnm]
+    print("#"*50)
+    print("Net charge of the mutated residues: ", net_charge)
+
+    NAscale = 0 
+    if net_charge != 0:
+        print("Scaling the charge of ions to neutralize the system...")
+        NAscale_tot = abs(net_charge*10) # Number of Na ions to scale
+
+        # count the number of NA and CL ions in the system
+        with open(pdbfile, 'r') as file:
+            lines = file.readlines()
+        NAtotal = 0
+        for line in lines:
+            if line.startswith('ATOM') and line[17:20] == ' NA':
+                NAtotal += 1
+        print("Number of NA ions in the system: ", NAtotal)
+        if NAscale_tot > NAtotal:
+            print("WARNING : The number of Na ions in the system is less than the required number to neutralize the system!")
+            print("Please consider adding the charge changing mutations in two different set of simulations as the system")
+            print("Running the simulations with net charge in the mutated state can affect the thermodynamics of the system.")
+            exit()
+        
+        print("Scaling ", NAscale_tot, " ions to neutralize the system...")
+
+        if net_charge < 0 :
+            newNA = 'NAN'
+        elif net_charge > 0 :
+            newNA = 'NAP'
+
+        pdblines = []
+        for line in lines:
+            if line.startswith('ATOM') and line[17:20] == ' NA':
+                if NAscale < NAscale_tot:
+                    line = line[:17] + newNA + line[20:]
+                    NAscale += 1
+            pdblines.append(line)
+        
+        shutil.copy(pdbfile, 'old_'+pdbfile)
+        with open(pdbfile, 'w') as file:
+            file.writelines(pdblines)
+            file.close()
+
+        updatedNA = NAtotal - NAscale_tot
+
+        #Update the topology file to include scaled NA ions
+        with open(topfile, 'r') as file:
+            lines = file.readlines()
+
+        new_lines = []
+        for line in lines:
+            if line.startswith('NA'):
+                line = f'NA   {updatedNA}\n'
+            new_lines.append(line)
+            if line.startswith('NA'): 
+                new_lines.append(f'NAP {NAscale_tot}\n')
+        
+        shutil.copy(topfile, 'old_'+topfile)
+        with open(topfile, 'w') as file:
+            file.writelines(new_lines)
+
+        print("The system is now neutralized!")
+    else:
+        print("The system is already neutralized!")
+    print("#"*50)
+
+check_stateB_charge('ions.pdb', 'newtopol.top')
