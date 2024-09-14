@@ -66,7 +66,7 @@ def check_gmx():
 
 # Function to create bash file with gmx commands for equilibration MD step:
 def runMDeq():
-    bashfile = 'runMD-equilb.sh'
+    bashfile = 'runMD-eq.sh'
     # copy all files from the directory 'mdppath' to current working directory
 
     with open(bashfile, 'w') as file:
@@ -94,155 +94,8 @@ def runMDfe():
         file.write("#"*50)
         file.close()
 
-
-# Check the oligomeric state of the protein complex
-if args.protoligmr not in ["monomer", "dimer"]:
-    print("Please provide a valid protein complex type: monomer or dimer")
-    exit()
-
-if args.protoligmr == "monomer":
-    #num_chains = 1
-    gen_dimer('prepped.pdb')
-elif args.protoligmr == "dimer":
-    #num_chains = 2
-    gen_monomer('prepped.pdb')
-
-for olig in ['monomer', 'dimer']:
-    if olig == 'monomer': num_chains = 1
-    elif olig == 'dimer': num_chains = 2
-
-    if os.path.exists(olig): shutil.move(olig, olig+'_old')
-    os.makedirs(olig)
-    shutil.move(olig+'.pdb', olig)
-    os.chdir(olig)
-
-    # Add N-terminal cap ACE and C-terminal cap NME to the protein complex
-    p = Model(olig+'.pdb', renumber_residues=False)
-    for chainindex in range(num_chains):
-        chain = list(p.chains)[chainindex]
-        chain.add_nterm_cap()
-        chain.add_cterm_cap()
-    p.write(olig+'_capped.pdb')
-
-    # Generate temporary GMX toppologies to match residue and atom names before introducing mutations with pmx
-    gmx.pdb2gmx(f=olig+'_capped.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water, other_flags='-ignh')
-
-    if args.fe == "no":
-        topol = 'topol.top'
-        pass
-    else:
-        # Introduce mutations and generate hybrid residues
-        with open(mutfile, 'r') as file:
-            mutline = [line.split() for line in file]
-
-        pmutref = Model('conf.pdb', renumber_residues=False)
-
-        # mutate residues of chain A and B if protein is a dimer, else over chain A only
-        for oresnm, mresid, mresnm in mutline:
-            mchain = "A"
-            pmut = mutate(m=pmutref, mut_resid=int(mresid), mut_resname=mresnm, mut_chain=mchain, ff='amber99sb-star-ildn-mut_FP')
-            if olig == 'dimer':
-                mchain = "B"
-                pmut = mutate(m=pmut, mut_resid=int(mresid), mut_resname=mresnm, mut_chain=mchain, ff='amber99sb-star-ildn-mut_FP')
-            pmutref = pmut
-            
-        pmutref.write(olig+'_mutated.pdb')
-        # Generate GMX toplogies
-        gmx.pdb2gmx(f=olig+'_mutated.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water)
-
-        if olig == "monomer":
-            gmxtop = Topology('topol.top', ff='amber99sb-star-ildn-mut_FP')
-            pmxtop, _ = gen_hybrid_top(gmxtop)
-            pmxtop.write('newtopol.top')
-        elif olig == "dimer":
-            shutil.copy('topol.top', 'newtopol.top')
-            for itp in ['topol_Protein_chain_A.itp', 'topol_Protein_chain_B.itp']:
-                gmxitp = Topology(itp, ff='amber99sb-star-ildn-mut_FP')
-                pmxitp, _ = gen_hybrid_top(gmxitp)
-                pmxitp.write('new'+itp)
-                # find string itp in newtopol.top and replace it with newitp
-                with open('newtopol.top', 'r') as file:
-                    filedata = file.read()
-                filedata = filedata.replace(itp, 'new'+itp)
-                with open('newtopol.top', 'w') as file:
-                    file.write(filedata)
-
-        topol = 'newtopol.top'
-
-    print("#"*50)
-    print("Generated hybrid topology files for the "+olig+" structure!")
-    print("Next, solvating the complex in a cubic box with 0.15M NaCl concentration...")
-
-    # Setup the solvated system with NA+ and CL- ions at 0.15 M concentration
-    gmx.editconf(f='conf.pdb', o='box.pdb', bt='cubic', d=1.0)
-    gmx.solvate(cp='box.pdb', cs='spc216.gro', o='solv.pdb', p=topol)
-    gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p=topol, o='ions.tpr', maxwarn='1')
-    gmx.genion(s='ions.tpr', o='ions.pdb', p=topol, neutral=True, conc=0.15)
-
-    # remove all the temporary files generated during the mutation process
-    for file in os.listdir('.'):
-        if file.startswith("#"):
-            os.remove(file)
-    os.chdir('..')
-
-print("#"*50)
-print("Generated solvated system with ions!")
-print("Proceeding to build the unfolded state peptide...")
-
-# Generate a tripeptide GXG with the mutation residue as X to model the unfolded state
-os.makedirs('unfolded')
-os.chdir('unfolded')
-for oresnm, mresid, mresnm in mutline:
-    ocode = library._one_letter[oresnm]
-    mcode = library._one_letter[mresnm]
-    os.mkdir(ocode + '2' + mcode) 
-    os.chdir(ocode + '2' + mcode)
-    gxg_pdbpath = cwd + '/data/tripeptide_GGG.pdb' 
-    shutil.copy(gxg_pdbpath, 'GGG.pdb') 
-    xres = 'GLY-2-' + oresnm
-    g = pdbfixer.PDBFixer(filename='GGG.pdb')
-    if oresnm != 'GLY': g.applyMutations([xres], 'A')
-    g.findMissingResidues()
-    g.findMissingAtoms()
-    g.addMissingAtoms()
-    g.addMissingHydrogens(7)
-    app.PDBFile.writeFile(g.topology, g.positions, open('unfolded.pdb', 'w'), keepIds=True) 
-
-    gxg = Model('unfolded.pdb', rename_atoms=True)
-    list(gxg.chains)[0].add_nterm_cap()
-    list(gxg.chains)[0].add_cterm_cap()
-    gxg.write('unfolded.pdb')
-    gmx.pdb2gmx(f='unfolded.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water, other_flags='-ignh')
-    gxgnew = Model('conf.pdb', renumber_residues=False)
-    gxgmut = mutate(m=gxgnew, mut_resid=2, mut_resname=mresnm, ff='amber99sb-star-ildn-mut_FP')
-    gxgmut.write('unfolded_'+ocode+'2'+mcode+'_mut.pdb')
-
-    # Generate GMX toplogies for hybrid residue and solvate the system without ions 
-    gmx.pdb2gmx(f='unfolded_'+ocode+'2'+mcode+'_mut.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water)
-    unftop = Topology('topol.top', ff='amber99sb-star-ildn-mut_FP')
-    unfpmxtop, _ = gen_hybrid_top(unftop)
-    unfpmxtop.write('newtopol.top')
-    topol = 'newtopol.top'
-    gmx.editconf(f='conf.pdb', o='box.pdb', bt='cubic', d=1.0)
-    gmx.solvate(cp='box.pdb', cs='spc216.gro', o='solv.pdb', p=topol)
-    gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p=topol, o='ions.tpr', maxwarn='1')
-    gmx.genion(s='ions.tpr', o='ions.pdb', p=topol, neutral=True, conc=0.15)
-
-    os.remove('GGG.pdb')
-    # remove all the temporary files generated during the mutation process
-    for file in os.listdir('.'):
-        if file.startswith("#"):
-            os.remove(file)
-    os.chdir('..')
-
-print("#"*50)
-print("Generated the unfolded state!")
-
-os.chdir(cwd)
-
 # Check the net charge of system in mutated state and scale the charge of ions to neutralize the system
-
-def check_stateB_charge(pdbfile, topfile, mutfile=args.mutfile):
+def check_stateB_charge(pdbfile, topfile):
     aa_charg_dict = {
         'ALA': 0,
         'ARG': 1,
@@ -340,5 +193,165 @@ def check_stateB_charge(pdbfile, topfile, mutfile=args.mutfile):
     else:
         print("The system is already neutralized!")
     print("#"*50)
+
+# Check the oligomeric state of the protein complex
+if args.protoligmr not in ["monomer", "dimer"]:
+    print("Please provide a valid protein complex type: monomer or dimer")
+    exit()
+
+if args.protoligmr == "monomer":
+    #num_chains = 1
+    gen_dimer('prepped.pdb')
+elif args.protoligmr == "dimer":
+    #num_chains = 2
+    gen_monomer('prepped.pdb')
+
+for olig in ['monomer', 'dimer']:
+    if olig == 'monomer': num_chains = 1
+    elif olig == 'dimer': num_chains = 2
+
+    if os.path.exists(olig): shutil.move(olig, olig+'_old')
+    os.makedirs(olig)
+    shutil.move(olig+'.pdb', olig)
+    os.chdir(olig)
+
+    # Add N-terminal cap ACE and C-terminal cap NME to the protein complex
+    p = Model(olig+'.pdb', renumber_residues=False)
+    for chainindex in range(num_chains):
+        chain = list(p.chains)[chainindex]
+        chain.add_nterm_cap()
+        chain.add_cterm_cap()
+    p.write(olig+'_capped.pdb')
+
+    # Generate temporary GMX toppologies to match residue and atom names before introducing mutations with pmx
+    gmx.pdb2gmx(f=olig+'_capped.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water, other_flags='-ignh')
+
+    if args.fe == "no":
+        topol = 'topol.top'
+        pass
+    else:
+        # Introduce mutations and generate hybrid residues
+        with open(mutfile, 'r') as file:
+            mutline = [line.split() for line in file]
+
+        pmutref = Model('conf.pdb', renumber_residues=False)
+
+        # mutate residues of chain A and B if protein is a dimer, else over chain A only
+        for oresnm, mresid, mresnm in mutline:
+            mchain = "A"
+            pmut = mutate(m=pmutref, mut_resid=int(mresid), mut_resname=mresnm, mut_chain=mchain, ff='amber99sb-star-ildn-mut_FP')
+            if olig == 'dimer':
+                mchain = "B"
+                pmut = mutate(m=pmut, mut_resid=int(mresid), mut_resname=mresnm, mut_chain=mchain, ff='amber99sb-star-ildn-mut_FP')
+            pmutref = pmut
+            
+        pmutref.write(olig+'_mutated.pdb')
+        # Generate GMX toplogies
+        gmx.pdb2gmx(f=olig+'_mutated.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water)
+
+        if olig == "monomer":
+            gmxtop = Topology('topol.top', ff='amber99sb-star-ildn-mut_FP')
+            pmxtop, _ = gen_hybrid_top(gmxtop)
+            pmxtop.write('newtopol.top')
+        elif olig == "dimer":
+            shutil.copy('topol.top', 'newtopol.top')
+            for itp in ['topol_Protein_chain_A.itp', 'topol_Protein_chain_B.itp']:
+                gmxitp = Topology(itp, ff='amber99sb-star-ildn-mut_FP')
+                pmxitp, _ = gen_hybrid_top(gmxitp)
+                pmxitp.write('new'+itp)
+                # find string itp in newtopol.top and replace it with newitp
+                with open('newtopol.top', 'r') as file:
+                    filedata = file.read()
+                filedata = filedata.replace(itp, 'new'+itp)
+                with open('newtopol.top', 'w') as file:
+                    file.write(filedata)
+
+        topol = 'newtopol.top'
+
+    print("#"*50)
+    print("Generated hybrid topology files for the "+olig+" structure!")
+    print("Next, solvating the complex in a cubic box with 0.15M NaCl concentration...")
+
+    # Setup the solvated system with NA+ and CL- ions at 0.15 M concentration
+    gmx.editconf(f='conf.pdb', o='box.pdb', bt='cubic', d=1.0)
+    gmx.solvate(cp='box.pdb', cs='spc216.gro', o='solv.pdb', p=topol)
+    gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p=topol, o='ions.tpr', maxwarn='1')
+    gmx.genion(s='ions.tpr', o='ions.pdb', p=topol, neutral=True, conc=0.15)
+
+    print("#"*50)
+    print("Checking the total charge of system in B-state and scaling the charge of ions accordingly....")
+    
+    check_stateB_charge('ions.pdb', 'newtopol.top')
+
+    print("Generating a bash files 'runMD-eq.sh' and 'runMD-fe.sh' with Gromacs commands to run the equilibration MD and Free-energy simulations")
+    runMDeq()
+    runMDfe()
+
+    # remove all the temporary files generated during the mutation process
+    for file in os.listdir('.'):
+        if file.startswith("#"):
+            os.remove(file)
+    os.chdir('..')
+
+print("#"*50)
+print("Generated solvated system with ions!")
+print("Proceeding to build the unfolded state peptide...")
+
+# Generate a tripeptide GXG with the mutation residue as X to model the unfolded state
+os.makedirs('unfolded')
+os.chdir('unfolded')
+for oresnm, mresid, mresnm in mutline:
+    ocode = library._one_letter[oresnm]
+    mcode = library._one_letter[mresnm]
+    os.mkdir(ocode + '2' + mcode) 
+    os.chdir(ocode + '2' + mcode)
+    gxg_pdbpath = cwd + '/data/tripeptide_GGG.pdb' 
+    shutil.copy(gxg_pdbpath, 'GGG.pdb') 
+    xres = 'GLY-2-' + oresnm
+    g = pdbfixer.PDBFixer(filename='GGG.pdb')
+    if oresnm != 'GLY': g.applyMutations([xres], 'A')
+    g.findMissingResidues()
+    g.findMissingAtoms()
+    g.addMissingAtoms()
+    g.addMissingHydrogens(7)
+    app.PDBFile.writeFile(g.topology, g.positions, open('unfolded.pdb', 'w'), keepIds=True) 
+
+    gxg = Model('unfolded.pdb', rename_atoms=True)
+    list(gxg.chains)[0].add_nterm_cap()
+    list(gxg.chains)[0].add_cterm_cap()
+    gxg.write('unfolded.pdb')
+    gmx.pdb2gmx(f='unfolded.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water, other_flags='-ignh')
+    gxgnew = Model('conf.pdb', renumber_residues=False)
+    gxgmut = mutate(m=gxgnew, mut_resid=2, mut_resname=mresnm, ff='amber99sb-star-ildn-mut_FP')
+    gxgmut.write('unfolded_'+ocode+'2'+mcode+'_mut.pdb')
+
+    # Generate GMX toplogies for hybrid residue and solvate the system without ions 
+    gmx.pdb2gmx(f='unfolded_'+ocode+'2'+mcode+'_mut.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water)
+    unftop = Topology('topol.top', ff='amber99sb-star-ildn-mut_FP')
+    unfpmxtop, _ = gen_hybrid_top(unftop)
+    unfpmxtop.write('newtopol.top')
+    topol = 'newtopol.top'
+    gmx.editconf(f='conf.pdb', o='box.pdb', bt='cubic', other_flags='-box 5')
+    gmx.solvate(cp='box.pdb', cs='spc216.gro', o='solv.pdb', p=topol)
+    gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p=topol, o='ions.tpr', maxwarn='1')
+    gmx.genion(s='ions.tpr', o='ions.pdb', p=topol, neutral=True, conc=0.15)
+
+    check_stateB_charge('ions.pdb', 'newtopol.top')
+
+    print("Generating a bash files 'runMD-eq.sh' and 'runMD-fe.sh' with Gromacs commands to run the equilibration MD and Free-energy simulations")
+    runMDeq()
+    runMDfe()
+
+    os.remove('GGG.pdb')
+    # remove all the temporary files generated during the mutation process
+    for file in os.listdir('.'):
+        if file.startswith("#"):
+            os.remove(file)
+    os.chdir('..')
+
+print("#"*50)
+print("Generated the unfolded state!")
+
+os.chdir(cwd)
 
 check_stateB_charge('ions.pdb', 'newtopol.top')
