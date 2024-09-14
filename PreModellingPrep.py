@@ -9,7 +9,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument("-pdbid" , required=False)
 parser.add_argument("-pdbfile" , required=False)
 parser.add_argument("-ph", type=int, help="pH value", required=False, default=7)
-parser.add_argument("-mutfile", required=False, help="File with mutations to introduce in the format org_resname, org_resid, mut_resname, chainID")
+parser.add_argument("-mutfile", required=False, help="File with mutations to introduce in the format org_resname, org_resid, mut_resname")
 parser.add_argument("-crotype", required=True, help="Type of chromophore: SYG or TYG")
 parser.add_argument("-cresid", required=True, help="Index of the chromophore residue")
 parser.add_argument("-protoligmr", help="Please check if your protein complex is a monomer or a dimer", required=False, default="dimer")
@@ -126,10 +126,12 @@ def build_mutation(fixer, mut=args.mutfile):
         mutline = [line.split() for line in file]
 
     # apply mutations
-    for oresnm, mresid, mresnm, mchain in mutline:
+    for oresnm, mresid, mresnm in mutline:
         mutres = oresnm + '-' + mresid + '-' + mresnm
-        fixer.applyMutations(mutres, mchain)
-   
+        fixer.applyMutations(mutres, "A")
+        if args.protoligmr == "dimer":
+            fixer.applyMutations(mutres, "B")
+           
     return fixer
 
 if args.fe is None or args.fe == "no":
