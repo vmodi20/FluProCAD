@@ -71,6 +71,8 @@ amber99_143       22.99000      ; NaS Smith parameters
 amber99_144       35.45000      ; ClS Smith parameters
 amber99_356       22.99000      ; Na+ Joung spce 
 amber99_351       35.45000      ; Cl- Joung spce
+NaN               22.99000
+NaP               22.99000
 DUM_HC    1.008000
 DUM_H     1.008000
 DUM_CT   12.010000
