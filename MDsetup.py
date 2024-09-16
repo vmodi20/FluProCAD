@@ -67,8 +67,6 @@ def check_gmx():
 # Function to create bash file with gmx commands for equilibration MD step:
 def runMDeq():
     bashfile = 'runMD-eq.sh'
-    # copy all files from the directory 'mdppath' to current working directory
-
     with open(bashfile, 'w') as file:
         file.write('#!/bin/bash\n')
         file.write('\n# Run minimization, NVT, and NPT simulations using Gromacs\n')
@@ -80,18 +78,23 @@ def runMDeq():
         file.write('gmx_mpi mdrun -deffnm npt\n')
         file.write('gmx_mpi grompp -f md.mdp -c npt.gro -p newtopol.top -r npt.gro -o topol.tpr -maxwarn 1\n')
         file.write('gmx_mpi mdrun -s topol\n')
-        file.write('\n'"#"*50'\n')
+        file.write('echo "Protein System " | gmx_mpi trjconv -f traj.trr -s topol.tpr -pbc mol -center -o confout-MDeq.gro')
         file.close()
 
 # Function to create bash file with gmx commands for free energy MD step:
 def runMDfe():
     bashfile = 'runMD-fe.sh'
-    # copy all files from the directory 'mdppath' to the current working directory
-
     with open(bashfile, 'w') as file:
         file.write('#!/bin/bash\n')
-        file.write('\n# Run free energy calculations using Gromacs\n')
-        file.write("#"*50)
+        file.write('\n# For each lambda point, run a minimization, NVT, and NPT simulation\n')
+        file.write('gmx_mpi grompp -f min-fe.mdp -c ../../confout-MDeq.gro -p ../../newtopol.top -o min-fe.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -deffnm min-fe\n')
+        file.write('gmx_mpi grompp -f nvt-fe.mdp -c min-fe.gro -p ../../newtopol.top -r min-fe.gro -o nvt-fe.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -deffnm nvt-fe\n')
+        file.write('gmx_mpi grompp -f npt-fe.mdp -c nvt-fe.gro -p ../../newtopol.top -r nvt-fe.gro -o npt-fe.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -deffnm npt-fe\n')
+        file.write('gmx_mpi grompp -f md-fe.mdp -c npt-fe.gro -p ../../newtopol.top -r npt-fe.gro -o topol.tpr -maxwarn 1\n')
+        file.write('gmx_mpi mdrun -s topol\n')
         file.close()
 
 # Check the net charge of system in mutated state and scale the charge of ions to neutralize the system
@@ -127,7 +130,7 @@ def check_stateB_charge(pdbfile, topfile):
     with open(mutfile, 'r') as file:
         mutline = [line.split() for line in file]
     net_charge = 0
-    for oresnm, mresid, mresnm, mchain in mutline:
+    for oresnm, mresid, mresnm in mutline:
         net_charge += aa_charg_dict[mresnm]
     print("#"*50)
     print("Net charge of the mutated residues: ", net_charge)
@@ -154,9 +157,9 @@ def check_stateB_charge(pdbfile, topfile):
         print("Scaling ", NAscale_tot, " ions to neutralize the system...")
 
         if net_charge < 0 :
-            newNA = 'NAN'
-        elif net_charge > 0 :
             newNA = 'NAP'
+        elif net_charge > 0 :
+            newNA = 'NAN'
 
         pdblines = []
         for line in lines:
@@ -183,7 +186,7 @@ def check_stateB_charge(pdbfile, topfile):
                 line = f'NA   {updatedNA}\n'
             new_lines.append(line)
             if line.startswith('NA'): 
-                new_lines.append(f'NAP {NAscale_tot}\n')
+                new_lines.append(f'{newNA} {NAscale_tot}\n')
         
         shutil.copy(topfile, 'old_'+topfile)
         with open(topfile, 'w') as file:
@@ -275,7 +278,7 @@ for olig in ['monomer', 'dimer']:
     # Setup the solvated system with NA+ and CL- ions at 0.15 M concentration
     gmx.editconf(f='conf.pdb', o='box.pdb', bt='cubic', d=1.0)
     gmx.solvate(cp='box.pdb', cs='spc216.gro', o='solv.pdb', p=topol)
-    gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p=topol, o='ions.tpr', maxwarn='1')
+    gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p=topol, o='ions.tpr', maxwarn='2')
     gmx.genion(s='ions.tpr', o='ions.pdb', p=topol, neutral=True, conc=0.15)
 
     print("#"*50)
@@ -283,6 +286,8 @@ for olig in ['monomer', 'dimer']:
     
     check_stateB_charge('ions.pdb', 'newtopol.top')
 
+    #copy all .mdp files from the mdpfiles path to current directory
+    shutil.copytree(mdppath, os.getcwd(), dirs_exist_ok=True)
     print("Generating a bash files 'runMD-eq.sh' and 'runMD-fe.sh' with Gromacs commands to run the equilibration MD and Free-energy simulations")
     runMDeq()
     runMDfe()
@@ -338,6 +343,8 @@ for oresnm, mresid, mresnm in mutline:
 
     check_stateB_charge('ions.pdb', 'newtopol.top')
 
+    #copy all .mdp files from the mdpfiles path to current directory
+    shutil.copytree(mdppath, os.getcwd(), dirs_exist_ok=True)
     print("Generating a bash files 'runMD-eq.sh' and 'runMD-fe.sh' with Gromacs commands to run the equilibration MD and Free-energy simulations")
     runMDeq()
     runMDfe()
@@ -353,5 +360,3 @@ print("#"*50)
 print("Generated the unfolded state!")
 
 os.chdir(cwd)
-
-check_stateB_charge('ions.pdb', 'newtopol.top')
