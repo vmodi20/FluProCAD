@@ -1,0 +1,68 @@
+;====================================================
+; Temperature equilibration - NVT for 500ps (PosRe)
+;====================================================
+
+;-------------------- RUN CONTROL -------------------
+define                 = -DPOSRES
+integrator             = md
+dt                     = 0.002
+nsteps                 = 250000
+
+;----------------- OUTPUT CONTROL -------------------
+nstxout                = 5000       ; save coordinates to .trr every 10 ps
+nstvout                = 5000       ; save velocities to .trr every 10 ps
+nstfout                = 5000       ; save forces to .trr every 10 ps
+nstlog                 = 50000       ; update log file every 100 ps
+nstenergy              = 5000       ; save energies every 10 steps
+nstcalcenergy          = 100
+
+;---------------- NEIGHBOR SEARCHING ----------------
+cutoff-scheme          = Verlet
+ns-type                = grid
+nstlist                = 10
+rlist                  = 1.0
+pbc                    = xyz
+
+;----------------- ELECTROSTATICS -------------------
+coulombtype            = PME 
+coulomb-modifier       = Potential-shift
+rcoulomb               = 1.0
+pme-order              = 4
+fourierspacing         = 0.12
+ewald-rtol             = 1e-5
+
+;--------------------- VDW --------------------------
+vdw-type               = Cut-off
+vdw-modifier           = Potential-shift
+rvdw                   = 1.0
+DispCorr               = EnerPres
+
+;--------- TEMPERATURE & PRESSURE COUPLING ----------
+tcoupl                 = V-rescale 
+tc-grps                = Protein Non-Protein
+ref-t                  = 300 300
+tau-t                  = 0.1 0.1
+pcoupl                 = no
+pcoupltype             = isotropic 
+tau_p                  = 2.0       
+ref_p                  = 1.0       
+compressibility        = 4.5e-05   
+refcoord-scaling       = no
+
+;---------- GENERATE VELOCITIES & CONTINUAITON-------
+gen-vel                = yes
+gen-temp               = 300
+gen-seed               = -1
+continuation           = no
+
+;-------------------- BONDS -------------------------
+constraint_algorithm   = lincs      
+constraints            = h-bonds    
+lincs-iter             = 2          
+lincs-order            = 6          
+lincs-warnangle        = 30         
+
+;-------------- Free energy parameters -------------- 
+free-energy            = yes
+init-lambda            = 0
+delta-lambda           = 0
