@@ -10,3 +10,4 @@ dependencies:
   - scipy
   - matplotlib
   - gromacs
+  - alchemlyb
