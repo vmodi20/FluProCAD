@@ -129,11 +129,14 @@ def check_stateB_charge(pdbfile, topfile):
     # Read the mutations file and calculate the net charge of the mutated residues
     with open(mutfile, 'r') as file:
         mutline = [line.split() for line in file]
-    net_charge = 0
+    net_charge_oresnm = 0
+    net_charge_mresnm = 0
     for oresnm, mresid, mresnm in mutline:
-        net_charge += aa_charg_dict[mresnm]
+        net_charge_mresnm += aa_charg_dict[mresnm]
+        net_charge_oresnm += aa_charg_dict[oresnm]
+    net_charge = net_charge_mresnm - net_charge_oresnm
     print("#"*50)
-    print("Net charge of the mutated residues: ", net_charge)
+    print("Net change in charge with the introduced mutations: ", net_charge)
 
     NAscale = 0 
     if net_charge != 0:
