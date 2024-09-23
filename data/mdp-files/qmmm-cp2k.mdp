@@ -1,0 +1,33 @@
+integrator  		= md  
+dt          		= 0.001
+nsteps      		= 0 
+
+; Set output frequency to each step
+nstxout                 = 1 
+nstlog                  = 1 
+nstcalcenergy           = 1 
+nstenergy               = 1 
+
+; Set cut-offs
+rlist               	= 0.2 
+rcoulomb	    	= 0.2 
+rvdw		    	= 0.2 
+
+;Temperature coupling options
+tcoupl                  = no
+nsttcouple              = 1
+tc-grps                 = System
+tau-t                   = 0.1
+ref-t                   = 300
+
+; GENERATE VELOCITIES FOR STARTUP RUN
+gen-vel                 = yes
+gen-temp                = 300 
+gen-seed                = -1
+
+; CP2K QMMM parameters
+qmmm-cp2k-active              = true   ; Activate QMMM MdModule
+qmmm-cp2k-qmgroup             = QM	; Index group of QM atoms
+qmmm-cp2k-qmmethod            = INPUT 
+qmmm-cp2k-qmcharge            = 0
+qmmm-cp2k-qmmultiplicity      = 1      ; Multiplicity of QM system

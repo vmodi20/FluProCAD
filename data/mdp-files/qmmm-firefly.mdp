@@ -1,0 +1,56 @@
+integrator               = md
+dt                       = 0.001
+nsteps                   = 0
+
+; OUTPUT CONTROL OPTIONS
+nstlog                   = 1
+nstcalcenergy            = -1
+nstenergy                = 1
+nstxtcout                = 1
+
+; NEIGHBORSEARCHING PARAMETERS
+nstlist                  = 10
+ns_type                  = grid
+pbc                      = xyz
+rlist                    = 1.0
+cutoff-scheme            = group
+
+; OPTIONS FOR ELECTROSTATICS AND VDW
+coulombtype              = PME
+rcoulomb                 = 1.0
+vdw-type                 = Cut-off
+rvdw                     = 1.0
+DispCorr                 = No
+
+; OPTIONS FOR WEAK COUPLING ALGORITHMS
+tcoupl                   = V-rescale
+tc-grps                  = MM QM
+tau-t                    = 0.1 0.1 
+ref-t                    = 300 300 
+; Pressure coupling     
+Pcoupl                   = Berendsen 
+Pcoupltype               = Isotropic
+tau-p                    = 1
+compressibility          = 4.5e-5
+ref-p                    = 1.0
+refcoord_scaling         = No
+
+; OPTIONS FOR QMMM calculations
+QMMM                     = yes
+QMMM-grps                = QM
+QMmethod                 = B3LYP 
+QMMMscheme               = normal
+QMbasis                  = 3-21G 
+QMcharge                 = 0
+QMmult                   = 1
+
+; GENERATE VELOCITIES FOR STARTUP RUN
+gen-vel                  = no 
+gen-temp                 = 300
+gen-seed                 = -1 
+
+; OPTIONS FOR BONDS    
+constraints              = h-bonds
+constraint-algorithm     = Lincs
+continuation             = yes
+
