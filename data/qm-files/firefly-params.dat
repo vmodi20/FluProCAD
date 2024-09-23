@@ -1,0 +1,20 @@
+ $contrl scftyp=mcscf runtyp=energy icharg=@chrg@ d5=.t. maxit=100 mult=1
+ inttyp=hondo icut=11 units=bohr mplevl=2 $end
+ $system mwords=250 timlim=90000 $end
+ $p2p p2p=.t. dlb=.t. $end
+ $smp smppar=.t. np=4 mklnp=4 $end
+ $scf soscf=.f. diis=.t. dirscf=.t. $END
+ $BASIS GBASIS=cc-pvdz extfil=1 $END
+ $moorth nostf=1 nozero=1 tole=0 tolz=0 $end
+ $trans dirtrf=.t. mptran=2 mode=112 altpar=1 aoints=dist $end
+ $MCSCF CISTEP=aldet MAXIT=100 acurcy=1d-5 $END
+ $det
+  group=c1 ncore=42 nact=12 nels=14 nstate=3
+  wstate(1)=1,1,1 maxv=4 nstgss=30 ispin=0
+  itermx=5000
+ $end
+ $GUESS GUESS=moread norb=54 norder=0
+ $END
+ $Xmcqdpt kstate(1)=1,1,1 avecoe(1)=1,1,1 nstate=3
+ thrwgt=1d-6 thrgen=1d-12 edshft=0.02 inorb=0 $end
+ $mcqfit $end
