@@ -427,8 +427,15 @@ def structpred_input():
         shutil.copy(cwd+'/analysis-MDeq.sh', 'analysis-MDeq.sh')
         shutil.copy(cwd+'/qmmm-inpsetup-firefly.sh', 'qmmm-inpsetup-firefly.sh')
         for file in os.listdir('.'):
-            if file.startswith("#"):
-                os.remove(file)
+            if file.startswith("#"): os.remove(file)
+            if file.endswith('-fe.mdp'): os.remove(file)
+        
+        with open('md.mdp', 'r') as f:
+            filedata = f.read()
+        filedata = filedata.replace('= 5000000', '= 50000000')
+        with open('md.mdp', 'w') as f:
+            f.write(filedata)
+        
         os.chdir('..')
     os.chdir('..')
 
