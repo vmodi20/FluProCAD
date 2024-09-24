@@ -10,10 +10,12 @@ FluProCAD installation includes the following steps:
 Download the code from gitlab with `git clone`
 
 Install the dependencies with conda on your local machince to run the workflow from the FluProCAD folder
-  	cd FluproCAD
-	conda config --add channels conda-forge
-	conda env create -f environment.yml
-	source activate fpc
+```
+cd FluproCAD
+conda config --add channels conda-forge
+conda env create -f environment.yml
+source activate fpc
+``` 
 
 This will install the required dependencies. After it you should be able to run FluProCAD
 
