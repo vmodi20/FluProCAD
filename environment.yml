@@ -1,7 +1,10 @@
 name: fpc
-
+channels:
+  - conda-forge
+  - schrodinger
+  - defaults
 dependencies:
-  - python>=3.11
+  - python ==3.11
   - pdbfixer
   - openmm
   - pymol
