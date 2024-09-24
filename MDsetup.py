@@ -23,7 +23,7 @@ ff = cwd + '/data/forcefields'
 mdppath = cwd + '/data/mdp-files/'
 mutfile = cwd + '/' + args.mutfile
 
-#os.environ['GMXLIB'] = cwd + '/data/forcefields'
+os.environ['GMXLIB'] = cwd + '/data/forcefields'
 
 os.chdir(args.proteindir)
 
