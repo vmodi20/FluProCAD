@@ -4,8 +4,7 @@ dependencies:
   - python>=3.11
   - pdbfixer
   - openmm
-  - pymol::schrodinger
-  - pmx
+  - pymol
   - numpy
   - scipy
   - matplotlib
