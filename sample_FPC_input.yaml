@@ -6,3 +6,4 @@ crotype: TYG
 cresid: '66'
 mutfile: mutations.txt
 fe: 'yes'
+structpred: 'yes'
