@@ -14,6 +14,7 @@ parser.add_argument("-crotype", required=True, help="Type of chromophore: SYG or
 parser.add_argument("-cresid", required=True, help="Index of the chromophore residue")
 parser.add_argument("-protoligmr", help="Please check if your protein complex is a monomer or a dimer", required=False, default="dimer")
 parser.add_argument("-fe", help="Perform free energy calculations (yes/no)", required=False, default="yes" )
+parser.add_argument("-structpred", help="Perform solution state structure prediction", required=False, default="yes")
 
 args = parser.parse_args()
 
@@ -41,6 +42,10 @@ if args.pdbid:
     urllib.request.urlretrieve("https://files.rcsb.org/download/"+protname+".pdb", protname+".pdb")
 elif args.pdbfile:
     protname = args.pdbfile.split('.')[0]
+else:
+    print("Please provide either a PDB file or a PDB ID!")
+    exit()
+
 
 # create a new directory and if it exists, move the existing directory to a new one
 if os.path.exists(protname): shutil.move(protname, protname+'_old')
@@ -128,16 +133,17 @@ def build_mutation(fixer, mut=args.mutfile):
     # apply mutations
     for oresnm, mresid, mresnm in mutline:
         mutres = oresnm + '-' + mresid + '-' + mresnm
-        fixer.applyMutations(mutres, "A")
+        fixer.applyMutations([mutres], "A")
         if args.protoligmr == "dimer":
             fixer.applyMutations(mutres, "B")
            
     return fixer
 
-if args.fe is None or args.fe == "no":
+if args.structpred == "yes":
+    shutil.copy(cwd+'/mutations.txt', 'mutations.txt')
     fixer = build_mutation(fixer)
     # save the mutated structure to pdb file
-    app.PDBFile.writeFile(fixer.topology, fixer.positions, open('prepped.pdb', 'w'), keepIds=True)
+    app.PDBFile.writeFile(fixer.topology, fixer.positions, open('prepped_structpred_input.pdb', 'w'), keepIds=True)
 
 os.remove('tmp.pdb')
 os.chdir(cwd)

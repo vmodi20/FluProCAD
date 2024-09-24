@@ -14,6 +14,7 @@ parser.add_argument("-ffmut", help='Force field for the mutated residues: amber9
 parser.add_argument("-water", help='Water model', required=False, default='tip3p')
 parser.add_argument("-protoligmr", help="Please check if your protein complex is a monomer or a dimer", required=False, default="dimer")
 parser.add_argument("-fe", help="Perform free energy calculations (yes/no)", required=False, default="yes" )
+parser.add_argument("-structpred", help="Perform solution state structure prediction", required=False, default="yes")
 
 args = parser.parse_args()
 
@@ -98,7 +99,8 @@ def runMDfe():
         file.close()
 
 # Check the net charge of system in mutated state and scale the charge of ions to neutralize the system
-def check_stateB_charge(pdbfile, topfile):
+def check_stateB_charge(pdbfile, topfile, olig):
+
     aa_charg_dict = {
         'ALA': 0,
         'ARG': 1,
@@ -135,11 +137,13 @@ def check_stateB_charge(pdbfile, topfile):
         net_charge_mresnm += aa_charg_dict[mresnm]
         net_charge_oresnm += aa_charg_dict[oresnm]
     net_charge = net_charge_mresnm - net_charge_oresnm
+    if olig == 'dimer':
+        net_charge = 2*net_charge
     print("#"*50)
     print("Net change in charge with the introduced mutations: ", net_charge)
 
     NAscale = 0 
-    if net_charge != 0:
+    if net_charge !=  0:
         print("Scaling the charge of ions to neutralize the system...")
         NAscale_tot = abs(net_charge*10) # Number of Na ions to scale
 
@@ -206,17 +210,18 @@ if args.protoligmr not in ["monomer", "dimer"]:
     exit()
 
 if args.protoligmr == "monomer":
-    #num_chains = 1
     gen_dimer('prepped.pdb')
 elif args.protoligmr == "dimer":
-    #num_chains = 2
     gen_monomer('prepped.pdb')
 
 for olig in ['monomer', 'dimer']:
     if olig == 'monomer': num_chains = 1
     elif olig == 'dimer': num_chains = 2
 
-    if os.path.exists(olig): shutil.move(olig, olig+'_old')
+    if os.path.exists(olig):
+        if os.path.exists(olig+'_old'):
+            shutil.rmtree(olig+'_old')
+            shutil.move(olig, olig+'_old')
     os.makedirs(olig)
     shutil.move(olig+'.pdb', olig)
     os.chdir(olig)
@@ -229,13 +234,10 @@ for olig in ['monomer', 'dimer']:
         chain.add_cterm_cap()
     p.write(olig+'_capped.pdb')
 
-    # Generate temporary GMX toppologies to match residue and atom names before introducing mutations with pmx
+    # Generate temporary GMX topologies to match residue and atom names before introducing mutations with pmx
     gmx.pdb2gmx(f=olig+'_capped.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water, other_flags='-ignh')
 
-    if args.fe == "no":
-        topol = 'topol.top'
-        pass
-    else:
+    if args.fe == "yes":
         # Introduce mutations and generate hybrid residues
         with open(mutfile, 'r') as file:
             mutline = [line.split() for line in file]
@@ -274,9 +276,9 @@ for olig in ['monomer', 'dimer']:
 
         topol = 'newtopol.top'
 
-    print("#"*50)
-    print("Generated hybrid topology files for the "+olig+" structure!")
-    print("Next, solvating the complex in a cubic box with 0.15M NaCl concentration...")
+        print("#"*50)
+        print("Generated hybrid topology files for the "+olig+" structure!")
+        print("Next, solvating the complex in a cubic box with 0.15M NaCl concentration...")
 
     # Setup the solvated system with NA+ and CL- ions at 0.15 M concentration
     gmx.editconf(f='conf.pdb', o='box.pdb', bt='cubic', d=1.0)
@@ -287,7 +289,7 @@ for olig in ['monomer', 'dimer']:
     print("#"*50)
     print("Checking the total charge of system in B-state and scaling the charge of ions accordingly....")
     
-    check_stateB_charge('ions.pdb', 'newtopol.top')
+    check_stateB_charge('ions.pdb', 'newtopol.top', olig)
 
     #copy all .mdp files from the mdpfiles path to current directory
     shutil.copytree(mdppath, os.getcwd(), dirs_exist_ok=True)
@@ -344,7 +346,7 @@ for oresnm, mresid, mresnm in mutline:
     gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p=topol, o='ions.tpr', maxwarn='1')
     gmx.genion(s='ions.tpr', o='ions.pdb', p=topol, neutral=True, conc=0.15)
 
-    check_stateB_charge('ions.pdb', 'newtopol.top')
+    check_stateB_charge('ions.pdb', 'newtopol.top', 'unfolded')
 
     #copy all .mdp files from the mdpfiles path to current directory
     shutil.copytree(mdppath, os.getcwd(), dirs_exist_ok=True)
@@ -359,7 +361,66 @@ for oresnm, mresid, mresnm in mutline:
             os.remove(file)
     os.chdir('..')
 
+os.chdir('..')
 print("#"*50)
 print("Generated the unfolded state!")
+
+def structpred_input():
+    os.makedirs('structpred')
+    os.chdir('structpred')
+    shutil.move(cwd+'/'+args.proteindir+'/prepped_structpred_input.pdb', 'prepped_structpred_input.pdb')
+
+    if args.protoligmr == "monomer":
+        gen_dimer('prepped_structpred_input.pdb')
+    elif args.protoligmr == "dimer":
+        gen_monomer('prepped_structpred_input.pdb')
+
+    for olig in ['monomer', 'dimer']:
+        if olig == 'monomer': num_chains = 1
+        elif olig == 'dimer': num_chains = 2
+
+        if os.path.exists(olig):
+            if os.path.exists(olig+'_old'): shutil.rmtree(olig+'_old')
+            shutil.move(olig, olig+'_old')
+        os.makedirs(olig)
+        shutil.move(olig+'.pdb', olig)
+        os.chdir(olig)
+
+        p = Model(olig+'.pdb', renumber_residues=False)
+        for chainindex in range(num_chains):
+            chain = list(p.chains)[chainindex]
+            chain.add_nterm_cap()
+            chain.add_cterm_cap()
+        p.write(olig+'_capped.pdb')
+
+        # Generate GMX topologies for the mutated FP 
+        print("Generating GMX topologies for mutated FP for the structure prediction MD simulations...")
+        gmx.pdb2gmx(f=olig+'_capped.pdb', o='conf.pdb', p='topol.top', ff='amber99sb-star-ildn-mut_FP', water=args.water, other_flags='-ignh')
+        print("Next, solvating the complex in a cubic box with 0.15M NaCl concentration...")
+        gmx.editconf(f='conf.pdb', o='box.pdb', bt='cubic', d=1.0)
+        gmx.solvate(cp='box.pdb', cs='spc216.gro', o='solv.pdb', p='topol.top')
+        gmx.grompp(f=mdppath+'min.mdp', c='solv.pdb', p='topol.top', o='ions.tpr', maxwarn='2')
+        gmx.genion(s='ions.tpr', o='ions.pdb', p='topol.top', neutral=True, conc=0.15)
+        print(" DONE!")
+        shutil.copytree(mdppath, os.getcwd(), dirs_exist_ok=True)
+        print("Generating a bash files 'runMD-eq.sh' with Gromacs commands to run 100ns equilibration MD simulations")
+        runMDeq()
+        print(" DONE!")
+        print(" Run the bash file 'runMD-eq.sh' locally or on a cluster to start equilibration MD simulations.")
+
+        shutil.copy(cwd+'/analysis-MDeq.sh', 'analysis-MDeq.sh')
+        shutil.copy(cwd+'/qmmm-inpsetup-firefly.sh', 'qmmm-inpsetup-firefly.sh')
+        os.chdir('..')
+    os.chdir('..')
+
+if args.structpred == "yes":
+    print("#"*50)
+    print("# Proceeding to generate input topologies for structure prediction of the protein complex...")
+
+    structpred_input()
+    print("#"*50)    
+    print("# Both monomer and dimer structures will be generated but run MD only for the correct oligomeric state.")
+    print("# Determine the correct oligomeric state based on dimerization free energy results or know literature")
+    print("#"*50)
 
 os.chdir(cwd)

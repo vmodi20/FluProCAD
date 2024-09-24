@@ -17,6 +17,7 @@ if len(sys.argv) > 1:
                 cresid = arguments['cresid']
                 protoligmr = arguments['protoligmr']
                 fe = arguments['fe']
+                structpred = arguments['structpred']
         else:
             print("#"*50)
             print("ERROR: Please check that the yaml file exists in the current working directory!\n")
@@ -38,8 +39,9 @@ else:
     mutfile = input("\nEnter name of file with mutations: ") 
     crotype = input("\nEnter type of chromophore (SYG or TYG): ") 
     cresid = input("\nEnter residue position for the chromophore: ") 
-    protoligmr = input("\nIs your protein complex a monomer or a dimer? (default is dimer): ") 
+    protoligmr = input("\nIs your protein complex a monomer or a dimer in the input structure?: ") 
     fe = input("\nPerform free energy calculations (yes/no, default is yes): ") 
+    structpred = input("\nPerform structural prediction (yes/no, default is yes): ")
 
     arguments = {
         'pdbid': pdbid,
@@ -49,7 +51,8 @@ else:
         'crotype': crotype,
         'cresid': cresid,
         'protoligmr': protoligmr,
-        'fe': fe
+        'fe': fe,
+        'structpred': structpred
     }
 
 # check if pdbid or pdbfilename is provided or if both are provided
@@ -80,7 +83,7 @@ if protoligmr not in ["monomer", "dimer"]:
     exit()
 
 if ph:
-    ph = round(ph)
+    ph = round(int(ph))
 elif not ph:
     ph = 7
 
@@ -94,9 +97,9 @@ print("The input has been saved to the file: ", yaml_file_path)
 
 # Run the python scripts "PreModellingPrep.py" and "MDsetup.py" with the user inputs
 if pdbid:
-    os.system('python PreModellingPrep.py -pdbid {} -ph {} -mutfile {} -crotype {} -cresid {} -protoligmr {} -fe {} > prep.log'.format(pdbid, ph, mutfile, crotype, cresid, protoligmr, fe))
+    os.system('python PreModellingPrep.py -pdbid {} -ph {} -mutfile {} -crotype {} -cresid {} -protoligmr {} -fe {} -structpred {} > prep.log'.format(pdbid, ph, mutfile, crotype, cresid, protoligmr, fe, structpred))
 elif pdbfile:
-    os.system('python PreModellingPrep.py -pdbfile {} -ph {} -mutfile {} -crotype {} -cresid {} -protoligmr {} -fe {} > prep.log'.format(pdbid, pdbfile, ph, mutfile, crotype, cresid, protoligmr, fe))
+    os.system('python PreModellingPrep.py -pdbfile {} -ph {} -mutfile {} -crotype {} -cresid {} -protoligmr {} -fe {} -structpred {} > prep.log'.format(pdbid, pdbfile, ph, mutfile, crotype, cresid, protoligmr, fe, structupred))
 
-os.system('python MDsetup.py -proteindir {} -mutfile {} -protoligmr {} -fe {} >> setup.log'.format(protname, mutfile, protoligmr, fe))
+os.system('python MDsetup.py -proteindir {} -mutfile {} -protoligmr {} -fe {} -structpred {} >> MDsetup.log'.format(protname, mutfile, protoligmr, fe, structpred))
 
