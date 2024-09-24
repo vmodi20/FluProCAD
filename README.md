@@ -12,13 +12,19 @@ Download the code from gitlab with `git clone`
 Install the dependencies with conda on your local machince to run the workflow from the FluProCAD folder
 ```
 cd FluProCAD
-conda config --add channels conda-forge
-conda config --add channels schrodinger
 conda env create -f environment.yml
 source activate fpc
 ``` 
 
-This will install the required dependencies. After it you should be able to run FluProCAD
+This will install the required dependencies. After it you should be able to run FluProCAD. Next, install the develop branch of `pmx` which is compatible with `python3`
+
+```
+git clone https://github.com/deGrootLab/pmx pmx
+cd pmx
+git checkout develop
+python setup.py install
+cd ..
+```
 
 The following sections will discuss the use of the workflow to model folding and dimerization free energy calculations as well as optical spectra for fluorescent protein mutants.
 
