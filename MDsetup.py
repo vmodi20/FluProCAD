@@ -85,18 +85,34 @@ def runMDeq():
 # Function to create bash file with gmx commands for free energy MD step:
 def runMDfe():
     bashfile = 'runMD-fe.sh'
-    with open(bashfile, 'w') as file:
-        file.write('#!/bin/bash\n')
-        file.write('\n# For each lambda point, run a minimization, NVT, and NPT simulation\n')
-        file.write('gmx_mpi grompp -f min-fe.mdp -c ../../confout-MDeq.gro -p ../../newtopol.top -o min-fe.tpr -maxwarn 1\n')
-        file.write('gmx_mpi mdrun -deffnm min-fe\n')
-        file.write('gmx_mpi grompp -f nvt-fe.mdp -c min-fe.gro -p ../../newtopol.top -r min-fe.gro -o nvt-fe.tpr -maxwarn 1\n')
-        file.write('gmx_mpi mdrun -deffnm nvt-fe\n')
-        file.write('gmx_mpi grompp -f npt-fe.mdp -c nvt-fe.gro -p ../../newtopol.top -r nvt-fe.gro -o npt-fe.tpr -maxwarn 1\n')
-        file.write('gmx_mpi mdrun -deffnm npt-fe\n')
-        file.write('gmx_mpi grompp -f md-fe.mdp -c npt-fe.gro -p ../../newtopol.top -r npt-fe.gro -o topol.tpr -maxwarn 1\n')
-        file.write('gmx_mpi mdrun -s topol\n')
-        file.close()
+    shutil.copy(cwd+'/analysis-feMD.py', 'analysis-feMD.py')
+    os.mkdir('slow-TI')
+    os.chdir('slow-TI')
+    for i in range(21):
+        os.mkdir(str(i))
+        for file in os.listdir(mdppath):
+            if file.endswith('-fe.mdp'):
+                # copy the file to the $i directory
+                shutil.copy(mdppath+file, str(i))
+                with open(str(i)+'/'+file, 'r') as f:
+                    filedata = f.read()
+                filedata = filedata.replace('@lambda@', str(i))
+                with open(str(i)+'/'+file, 'w') as f:
+                    f.write(filedata)
+            
+        with open(str(i)+'/'+bashfile, 'w') as file:
+            file.write('#!/bin/bash\n')
+            file.write('\n# For each lambda point, run a minimization, NVT, and NPT simulation\n')
+            file.write('gmx_mpi grompp -f min-fe.mdp -c ../../confout-MDeq.gro -p ../../newtopol.top -o min-fe.tpr -maxwarn 1\n')
+            file.write('gmx_mpi mdrun -deffnm min-fe\n')
+            file.write('gmx_mpi grompp -f nvt-fe.mdp -c min-fe.gro -p ../../newtopol.top -r min-fe.gro -o nvt-fe.tpr -maxwarn 1\n')
+            file.write('gmx_mpi mdrun -deffnm nvt-fe\n')
+            file.write('gmx_mpi grompp -f npt-fe.mdp -c nvt-fe.gro -p ../../newtopol.top -r nvt-fe.gro -o npt-fe.tpr -maxwarn 1\n')
+            file.write('gmx_mpi mdrun -deffnm npt-fe\n')
+            file.write('gmx_mpi grompp -f md-fe.mdp -c npt-fe.gro -p ../../newtopol.top -r npt-fe.gro -o topol.tpr -maxwarn 1\n')
+            file.write('gmx_mpi mdrun -s topol\n')
+            file.close()
+    os.chdir('..')
 
 # Check the net charge of system in mutated state and scale the charge of ions to neutralize the system
 def check_stateB_charge(pdbfile, topfile, olig):
@@ -410,6 +426,9 @@ def structpred_input():
 
         shutil.copy(cwd+'/analysis-MDeq.sh', 'analysis-MDeq.sh')
         shutil.copy(cwd+'/qmmm-inpsetup-firefly.sh', 'qmmm-inpsetup-firefly.sh')
+        for file in os.listdir('.'):
+            if file.startswith("#"):
+                os.remove(file)
         os.chdir('..')
     os.chdir('..')
 
